@@ -213,7 +213,7 @@ class ConfigureCommand extends Command
         return rtrim($this->paths()->getRelativePath($topLevel), '/');
     }
 
-    public function pathValidator($path): bool
+    public function pathValidator($path)
     {
         if (!$this->filesystem->exists($path)) {
             throw new RuntimeException(sprintf('The path %s could not be found!', $path));

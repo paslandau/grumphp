@@ -79,6 +79,13 @@ class RunCommand extends Command
             'Example: --file-provider="changed"',
             DefaultProvider::NAME
         );
+        $this->addOption(
+            'file-exclude-regex',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'If given, this value is used as a regular expression to exclude files retrieved from the file provider. '.
+            'Example: vendor/f.*'
+        );
         $this->addArgument(
             'files',
             InputArgument::IS_ARRAY | InputArgument::OPTIONAL,
@@ -90,8 +97,9 @@ class RunCommand extends Command
     {
         $files        = $input->getArgument("files") ?? [];
         $providerName = $input->getOption("file-provider");
-        $files      = $this->resolveFiles($files, $providerName);
-        $testSuites = $this->grumPHP->getTestSuites();
+        $excludeRegex = $input->getOption("file-exclude-regex") ?? "";
+        $files        = $this->resolveFiles($files, $providerName, $excludeRegex);
+        $testSuites   = $this->grumPHP->getTestSuites();
 
         $tasks           = $this->resolveTasks($input->getOption("tasks") ?? "");
         $parallelOptions = $this->resolveParallelOptions();
@@ -127,9 +135,10 @@ class RunCommand extends Command
     /**
      * @param string[] $files
      * @param string $providerName
+     * @param string $excludeRegex
      * @return FilesCollection
      */
-    protected function resolveFiles(array $files, string $providerName): FilesCollection
+    protected function resolveFiles(array $files, string $providerName, string $excludeRegex): FilesCollection
     {
         if (count($files) > 0) {
             $collection = new FilesCollection();
@@ -139,7 +148,16 @@ class RunCommand extends Command
             return $collection;
         }
         $provider = $this->resolveProvider($providerName);
-        return $provider->getFiles();
+        $files    = $provider->getFiles();
+        if (trim($excludeRegex) !== "") {
+            $files = $files->filter(function (SplFileInfo $file) use ($excludeRegex) {
+                $subject = $file->getPathname();
+                $pattern = "#$excludeRegex#u";
+                $result = !preg_match($pattern, $subject);
+                return $result;
+            });
+        }
+        return $files;
     }
 
     /**
